@@ -93,6 +93,26 @@ until the organizer confirms the address through an official channel.
 Until then, invoices are composed against the candidate address so the flow can be
 demonstrated, and the pay button shows the reason it is locked.
 
+### What flips when you set it
+
+Setting `VITE_WIF_TOKEN_ADDRESS` switches on the pay button and, at the same time, changes
+what counts as a valid invoice. Read this before flipping it on the day:
+
+1. **Invoices signed before the flip still name the candidate address.** Check 04 compares
+   an invoice's token against the one this build pins, so an older link will fail that
+   check and stay locked. That is the gate working, but it means a link you shared earlier
+   cannot be paid afterwards.
+2. **Regenerate the sample invoice** so it names the pinned contract:
+
+   ```bash
+   node --env-file=.env scripts/make-demo-invoice.mjs
+   ```
+
+3. **The sample pays a publicly known address.** Its private key is committed in
+   `scripts/make-demo-invoice.mjs`, so the app refuses payment to the sample even with
+   payments enabled. To demo a real transfer, create an invoice paying an address you
+   control.
+
 ---
 
 ## Chain configuration
@@ -174,7 +194,11 @@ npm run build
 # deploy the contents of dist/
 ```
 
-For GitHub Pages, publish `dist/` to a `gh-pages` branch.
+For GitHub Pages, `.github/workflows/deploy.yml` builds the app, runs the full test suite,
+and publishes `dist/` on every push to `main`. Enable it once under **Settings → Pages →
+Source: GitHub Actions**. Tests run before the deploy step, so a failing check never ships.
+
+Until Pages is switched on there is no hosted build — the app runs from `npm run dev`.
 
 ---
 
@@ -194,7 +218,7 @@ src/
 │   ├── format.ts   base-unit amount parsing and display
 │   └── wallet.ts   EIP-1193 injected-wallet adapter
 └── styles/         design tokens and layout
-tests/              signature, mutation, expiry and gate cases
+tests/              signature, mutation, expiry, gate and receipt cases
 ```
 
 ---

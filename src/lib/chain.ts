@@ -47,6 +47,14 @@ export const PAYMENTS_ENABLED = WIF_TOKEN_ADDRESS !== null
  */
 export const CANDIDATE_WIF_TOKEN: Hex = '0x5173b8eA6923c2d40267890D45C46a3480954773'
 
+/**
+ * The address the sample invoice pays. Its private key is the publicly known
+ * development key committed in scripts/make-demo-invoice.mjs, so anything sent
+ * there can be swept by anyone who has read this repository. Payment to it is
+ * refused even when payments are enabled.
+ */
+export const SAMPLE_PAYEE: Hex = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'
+
 /** Token address written into new invoices. */
 export const INVOICE_TOKEN: Hex = WIF_TOKEN_ADDRESS ?? CANDIDATE_WIF_TOKEN
 

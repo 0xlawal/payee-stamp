@@ -22,7 +22,14 @@ const outFile = resolve(here, '../src/demo/demoInvoice.ts')
 const DEMO_KEY =
   '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d'
 
-const CANDIDATE_WIF = '0x5173b8eA6923c2d40267890D45C46a3480954773'
+/**
+ * Follow the same pin the app reads. If the build pins a contract, the sample
+ * must name that contract too, or check 04 fails and the sample becomes
+ * unpayable the moment payments are switched on.
+ */
+const CANDIDATE_WIF =
+  process.env.VITE_WIF_TOKEN_ADDRESS?.trim() ||
+  '0x5173b8eA6923c2d40267890D45C46a3480954773'
 const CHAIN_ID = 4663
 
 const account = privateKeyToAccount(DEMO_KEY)

@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
-import { decodeInvoice, recoverSigner } from '../lib/eip712'
+import { decodeInvoice, recoverSigner, sameAddress } from '../lib/eip712'
 import { buildChecks, outstandingWarnings, paymentGate } from '../lib/verify'
-import { CHAIN_ID, PAYMENTS_ENABLED, WIF_TOKEN_ADDRESS, explorerTx } from '../lib/chain'
+import {
+  CHAIN_ID,
+  PAYMENTS_ENABLED,
+  SAMPLE_PAYEE,
+  WIF_TOKEN_ADDRESS,
+  explorerTx,
+} from '../lib/chain'
 import { ERC20_ABI, verifyReceipt, waitForReceipt } from '../lib/erc20'
 import { formatAmount } from '../lib/format'
 import { getPayment, getPayeeRecord, savePayee, setPayment } from '../lib/local-store'
@@ -90,6 +96,12 @@ export function ReviewScreen({ encoded }: { encoded: string }) {
   const pendingPrior =
     priorPayment?.state === 'pending' && priorPayment.txHash ? priorPayment : undefined
 
+  /**
+   * The sample invoice pays an address whose private key is in this repository.
+   * It exists to exercise verification, never to receive funds.
+   */
+  const samplePayee = sameAddress(invoice.payload.payee, SAMPLE_PAYEE)
+
   const wrongNetwork = wallet.address !== null && wallet.chainId !== CHAIN_ID
   const canPay =
     gate.allowed &&
@@ -97,6 +109,7 @@ export function ReviewScreen({ encoded }: { encoded: string }) {
     !wrongNetwork &&
     !alreadyPaid &&
     !pendingPrior &&
+    !samplePayee &&
     (warnings.length === 0 || ack) &&
     phase !== 'pending' &&
     phase !== 'signing'
@@ -284,6 +297,15 @@ export function ReviewScreen({ encoded }: { encoded: string }) {
                 Invoices can be verified, but the pay action is disabled so nobody sends
                 to an unconfirmed token. Set <span className="mono">VITE_WIF_TOKEN_ADDRESS</span>{' '}
                 once the organizer confirms it.
+              </Notice>
+            ) : null}
+
+            {samplePayee && PAYMENTS_ENABLED ? (
+              <Notice tone="warn">
+                <strong>This sample pays a publicly known address.</strong> Its private key
+                is committed in this repository, so anything sent there can be taken by
+                anyone who has read it. Payment to the sample is disabled on purpose. Create
+                your own invoice, paying an address you control, to demo a real transfer.
               </Notice>
             ) : null}
 
