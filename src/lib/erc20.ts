@@ -56,12 +56,17 @@ export interface ReceiptCheck {
  * recipient. We require a Transfer event from the pinned contract, from the
  * payer, to the payee, for the exact raw amount.
  *
+ * `from` may be null when re-checking a transfer whose payer we cannot know
+ * (for example after a reload, before a wallet is reconnected). Token,
+ * recipient and exact amount are still pinned, and the caller must only pass
+ * null for a transaction hash this browser submitted itself.
+ *
  * What this cannot prove: a Transfer event carries no invoice ID, so we cannot
  * show onchain that this transfer settled only this invoice.
  */
 export function verifyReceipt(
   receipt: TransactionReceipt,
-  expected: { token: Hex; from: Hex; to: Hex; amount: bigint },
+  expected: { token: Hex; from: Hex | null; to: Hex; amount: bigint },
 ): ReceiptCheck {
   if (receipt.status !== 'success') {
     return { ok: false, reason: 'Transaction reverted on chain.' }
@@ -77,7 +82,8 @@ export function verifyReceipt(
     const args = log.args
     return (
       log.address.toLowerCase() === expected.token.toLowerCase() &&
-      args.from?.toLowerCase() === expected.from.toLowerCase() &&
+      (expected.from === null ||
+        args.from?.toLowerCase() === expected.from.toLowerCase()) &&
       args.to?.toLowerCase() === expected.to.toLowerCase() &&
       args.value === expected.amount
     )

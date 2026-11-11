@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { decodeInvoice, recoverSigner } from '../lib/eip712'
 import { buildChecks, outstandingWarnings, paymentGate } from '../lib/verify'
-import { CHAIN_ID, PAYMENTS_ENABLED, WIF_TOKEN_ADDRESS } from '../lib/chain'
+import { CHAIN_ID, PAYMENTS_ENABLED, WIF_TOKEN_ADDRESS, explorerTx } from '../lib/chain'
 import { ERC20_ABI, verifyReceipt, waitForReceipt } from '../lib/erc20'
 import { formatAmount } from '../lib/format'
 import { getPayment, getPayeeRecord, savePayee, setPayment } from '../lib/local-store'
@@ -82,6 +82,13 @@ export function ReviewScreen({ encoded }: { encoded: string }) {
   const warnings = outstandingWarnings(checks)
   const priorPayment = getPayment(invoice.payload.invoiceId)
   const alreadyPaid = priorPayment?.state === 'paid'
+  /**
+   * A transfer submitted from this browser that has not settled yet. Reloading
+   * the page must not release the pay button, or the same invoice can be paid
+   * twice by accident.
+   */
+  const pendingPrior =
+    priorPayment?.state === 'pending' && priorPayment.txHash ? priorPayment : undefined
 
   const wrongNetwork = wallet.address !== null && wallet.chainId !== CHAIN_ID
   const canPay =
@@ -89,12 +96,17 @@ export function ReviewScreen({ encoded }: { encoded: string }) {
     wallet.address !== null &&
     !wrongNetwork &&
     !alreadyPaid &&
+    !pendingPrior &&
     (warnings.length === 0 || ack) &&
     phase !== 'pending' &&
     phase !== 'signing'
 
   async function handlePay() {
     if (!invoice || !wallet.walletClient || !wallet.address || !WIF_TOKEN_ADDRESS) return
+
+    const id = invoice.payload.invoiceId
+    const payee = invoice.payload.payee
+    const amount = invoice.payload.amount
 
     setError(null)
     setPhase('signing')
@@ -103,53 +115,99 @@ export function ReviewScreen({ encoded }: { encoded: string }) {
         address: WIF_TOKEN_ADDRESS,
         abi: ERC20_ABI,
         functionName: 'transfer',
-        args: [invoice.payload.payee, BigInt(invoice.payload.amount)],
+        args: [payee, BigInt(amount)],
         account: wallet.address,
         chain: wallet.walletClient.chain,
       })
 
       setTxHash(hash)
       setPhase('pending')
-      setPayment(invoice.payload.invoiceId, {
-        state: 'pending',
-        payee: invoice.payload.payee,
-        amount: invoice.payload.amount,
-        txHash: hash,
-      })
+      setPayment(id, { state: 'pending', payee, amount, txHash: hash })
 
       const receipt = await waitForReceipt(hash)
+      if (receipt.status !== 'success') {
+        setPayment(id, { state: 'failed', payee, amount, txHash: hash })
+        setError('The transfer reverted on chain. Nothing was sent.')
+        setPhase('failed')
+        return
+      }
+
+      // Verify against the contract we actually sent to, not the invoice's own
+      // claim. Check 04 already requires the two to match, so this is a second
+      // lock on the same door.
       const check = verifyReceipt(receipt, {
-        token: invoice.payload.token,
+        token: WIF_TOKEN_ADDRESS,
         from: wallet.address,
-        to: invoice.payload.payee,
-        amount: BigInt(invoice.payload.amount),
+        to: payee,
+        amount: BigInt(amount),
       })
 
       if (!check.ok) {
         setError(check.reason ?? 'Receipt did not match this invoice.')
         setPhase('failed')
-        setPayment(invoice.payload.invoiceId, {
-          state: 'failed',
-          payee: invoice.payload.payee,
-          amount: invoice.payload.amount,
-          txHash: hash,
-        })
+        setPayment(id, { state: 'failed', payee, amount, txHash: hash })
         return
       }
 
-      savePayee(invoice.payload.payee)
-      setPayment(invoice.payload.invoiceId, {
-        state: 'paid',
-        payee: invoice.payload.payee,
-        amount: invoice.payload.amount,
-        txHash: hash,
-      })
+      savePayee(payee)
+      setPayment(id, { state: 'paid', payee, amount, txHash: hash })
       setPhase('paid')
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'The wallet did not complete the transfer.'
       setError(message)
       setPhase('failed')
+    }
+  }
+
+  /**
+   * Re-check a transfer this browser already submitted, for example after a
+   * reload. A successful receipt that does not match this invoice is left
+   * pending rather than failed, so it can never unlock a second payment.
+   */
+  async function recheckPending(hash: Hex) {
+    if (!invoice || !WIF_TOKEN_ADDRESS) return
+
+    const id = invoice.payload.invoiceId
+    const payee = invoice.payload.payee
+    const amount = invoice.payload.amount
+
+    setError(null)
+    setTxHash(hash)
+    setPhase('pending')
+    try {
+      const receipt = await waitForReceipt(hash)
+
+      if (receipt.status !== 'success') {
+        setPayment(id, { state: 'failed', payee, amount, txHash: hash })
+        setError('That transfer reverted on chain. Nothing was sent.')
+        setPhase('failed')
+        return
+      }
+
+      // The payer may have changed wallet since the reload, so only pin what
+      // this transaction hash must contain: token, recipient, exact amount.
+      const check = verifyReceipt(receipt, {
+        token: WIF_TOKEN_ADDRESS,
+        from: null,
+        to: payee,
+        amount: BigInt(amount),
+      })
+
+      if (!check.ok) {
+        setError(
+          `${check.reason ?? 'Receipt did not match this invoice.'} This transfer stays marked pending — check it on the explorer before paying again.`,
+        )
+        setPhase('idle')
+        return
+      }
+
+      savePayee(payee)
+      setPayment(id, { state: 'paid', payee, amount, txHash: hash })
+      setPhase('paid')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not read that transaction.')
+      setPhase('idle')
     }
   }
 
@@ -188,6 +246,33 @@ export function ReviewScreen({ encoded }: { encoded: string }) {
               <Notice tone="info">
                 Transaction submitted. Waiting for the chain to confirm it. This is not
                 paid until the receipt verifies.
+              </Notice>
+            ) : null}
+
+            {pendingPrior && phase !== 'paid' ? (
+              <Notice tone="warn">
+                <strong>A transfer for this invoice is already pending.</strong> It was
+                submitted from this browser and has not confirmed yet. Paying again could
+                send the money twice.
+                <div style={{ marginTop: 6 }}>
+                  <a
+                    className="mono"
+                    href={explorerTx(pendingPrior.txHash!)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {pendingPrior.txHash!.slice(0, 10)}… on explorer
+                  </a>
+                </div>
+                <div style={{ marginTop: 8 }}>
+                  <button
+                    className="btn btn--ghost"
+                    onClick={() => void recheckPending(pendingPrior.txHash!)}
+                    disabled={phase === 'pending'}
+                  >
+                    Re-check that transfer
+                  </button>
+                </div>
               </Notice>
             ) : null}
 
