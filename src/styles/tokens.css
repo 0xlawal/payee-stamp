@@ -1,0 +1,43 @@
+:root {
+  /* Surface */
+  --graphite: #090b0a;
+  --graphite-raise: #101413;
+  --graphite-sunk: #060807;
+  --line: #1d2422;
+  --line-strong: #2b3431;
+
+  /* Paper — the invoice itself */
+  --paper: #f1f1e9;
+  --paper-ink: #0a0c0b;
+  --paper-muted: #5c625e;
+  --paper-line: #d3d3c7;
+
+  /* Signal */
+  --lime: #c6f550;
+  --lime-dim: #9dc43c;
+  --amber: #f0b65b;
+  --red: #ff5a52;
+
+  /* Text on graphite */
+  --ink: #e9ebe5;
+  --ink-muted: #8b9490;
+  --ink-faint: #5a6360;
+
+  /* Type */
+  --sans: 'Segoe UI Variable Display', 'Segoe UI', system-ui, -apple-system,
+    'Helvetica Neue', Arial, sans-serif;
+  --mono: 'Cascadia Code', 'SF Mono', 'Consolas', ui-monospace, monospace;
+
+  /* Rhythm */
+  --gap: 24px;
+  --radius: 3px;
+  --radius-lg: 6px;
+
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ease: linear;
+  }
+}
