@@ -8,7 +8,9 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "typecheck": "tsc -b --noEmit"
+    "typecheck": "tsc -b --noEmit",
+    "video": "remotion studio",
+    "video:render": "remotion render PayeeStampDemo out/payee-stamp-demo.mp4"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -16,9 +18,11 @@
     "viem": "^2.21.0"
   },
   "devDependencies": {
+    "@remotion/cli": "^4.0.543",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.3",
+    "remotion": "^4.0.543",
     "typescript": "^5.6.3",
     "vite": "^5.4.10",
     "vitest": "^2.1.4"
