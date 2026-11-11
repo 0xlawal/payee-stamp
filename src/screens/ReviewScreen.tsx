@@ -73,8 +73,9 @@ export function ReviewScreen({ encoded }: { encoded: string }) {
   const savedRecord = getPayeeRecord(invoice.payload.payee)
   const checks = buildChecks({
     payload: invoice.payload,
-    signer: recovering ? null : signer,
+    signer,
     savedRecord,
+    recovering,
   })
 
   const gate = paymentGate(checks, PAYMENTS_ENABLED)

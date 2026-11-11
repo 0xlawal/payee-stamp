@@ -27,8 +27,12 @@ describe('parseAmount', () => {
 })
 
 describe('formatAmount', () => {
-  it('formats whole amounts without a decimal point', () => {
-    expect(formatAmount((8400n * 10n ** 18n).toString())).toBe('8400')
+  it('formats whole amounts with thousands separators', () => {
+    expect(formatAmount((8400n * 10n ** 18n).toString())).toBe('8,400')
+  })
+
+  it('groups very large amounts', () => {
+    expect(formatAmount((1234567n * 10n ** 18n).toString())).toBe('1,234,567')
   })
 
   it('trims trailing zeros in the fraction', () => {
@@ -38,7 +42,7 @@ describe('formatAmount', () => {
   it('round-trips with parseAmount', () => {
     const raw = parseAmount('1234.5678')
     expect(raw).not.toBeNull()
-    expect(formatAmount(raw!.toString(), 4)).toBe('1234.5678')
+    expect(formatAmount(raw!.toString(), 4)).toBe('1,234.5678')
   })
 
   it('returns a dash for garbage', () => {

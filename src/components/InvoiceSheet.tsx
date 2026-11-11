@@ -1,5 +1,5 @@
 import type { InvoicePayload } from '../types'
-import { formatAmount, formatTimestamp } from '../lib/format'
+import { formatAmount, formatTimestamp, shortAddress } from '../lib/format'
 import { CopyButton } from './ui'
 
 export function InvoiceSheet({ payload }: { payload: InvoicePayload }) {
@@ -26,9 +26,7 @@ export function InvoiceSheet({ payload }: { payload: InvoicePayload }) {
       <div className="sheet__grid">
         <div>
           <p className="sheet__addr-label">Payee / signer</p>
-          <p className="sheet__payee-name">
-            {payload.reference ? 'Signed payee' : 'Signed payee'}
-          </p>
+          <p className="sheet__payee-name mono">{shortAddress(payload.payee, 8, 6)}</p>
           <p className="sheet__note">
             The wallet that signed these fields. Not a legal identity proof.
           </p>

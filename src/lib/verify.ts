@@ -8,6 +8,8 @@ export interface VerifyContext {
   signer: Hex | null
   savedRecord: PayeeRecord | undefined
   now?: number
+  /** True while signature recovery is still running. */
+  recovering?: boolean
 }
 
 /**
@@ -23,18 +25,21 @@ export function buildChecks(ctx: VerifyContext): CheckResult[] {
   const checks: CheckResult[] = []
 
   /* 01 — signature */
+  const recovering = ctx.recovering === true
   const signatureOk = signer !== null && sameAddress(signer, payload.payee)
   checks.push({
     id: 'signature',
     index: '01',
     label: 'Invoice signature',
-    detail: signatureOk
-      ? 'Typed fields recover to the stated payee address.'
-      : signer
-        ? 'Signature recovers to a different address than the stated payee.'
-        : 'Signature could not be recovered from these fields.',
-    status: signatureOk ? 'pass' : 'fail',
-    badge: signatureOk ? 'MATCH' : 'MISMATCH',
+    detail: recovering
+      ? 'Recovering the signer from the signature…'
+      : signatureOk
+        ? 'Typed fields recover to the stated payee address.'
+        : signer
+          ? 'Signature recovers to a different address than the stated payee.'
+          : 'Signature could not be recovered from these fields.',
+    status: recovering ? 'idle' : signatureOk ? 'pass' : 'fail',
+    badge: recovering ? 'VERIFYING' : signatureOk ? 'MATCH' : 'MISMATCH',
   })
 
   /* 02 — saved payee record */

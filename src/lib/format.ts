@@ -16,7 +16,7 @@ export function formatAmount(raw: string, maxFractionDigits = 4): string {
   const whole = value / base
   const fraction = value % base
 
-  let out = whole.toString()
+  let out = whole.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')
 
   if (fraction > 0n) {
     let frac = fraction.toString().padStart(Number(DECIMALS), '0')
