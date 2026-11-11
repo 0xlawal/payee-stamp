@@ -1,5 +1,8 @@
 const DECIMALS = 18n
 
+/** An ERC-20 amount is a uint256. Anything larger cannot be signed or sent. */
+const MAX_UINT256 = (1n << 256n) - 1n
+
 /** Format a raw base-unit amount as a human string, trimming trailing zeros. */
 export function formatAmount(raw: string, maxFractionDigits = 4): string {
   let value: bigint
@@ -22,7 +25,13 @@ export function formatAmount(raw: string, maxFractionDigits = 4): string {
     let frac = fraction.toString().padStart(Number(DECIMALS), '0')
     // Show at most maxFractionDigits, then strip trailing zeros.
     frac = frac.slice(0, maxFractionDigits).replace(/0+$/, '')
-    if (frac.length > 0) out += `.${frac}`
+    if (frac.length > 0) {
+      out += `.${frac}`
+    } else if (whole === 0n) {
+      // A non-zero amount that rounds away must not render as "0": that is how
+      // a payer ends up approving a transfer the button called zero.
+      out = `<0.${'0'.repeat(Math.max(maxFractionDigits - 1, 0))}1`
+    }
   }
 
   return negative ? `-${out}` : out
@@ -42,7 +51,10 @@ export function parseAmount(input: string): bigint | null {
   const frac = fracPart.padEnd(Number(DECIMALS), '0')
 
   try {
-    return BigInt(whole) * 10n ** DECIMALS + BigInt(frac)
+    const value = BigInt(whole) * 10n ** DECIMALS + BigInt(frac)
+    // Reject what the token could not represent rather than signing an amount
+    // that no contract would accept.
+    return value > MAX_UINT256 ? null : value
   } catch {
     return null
   }

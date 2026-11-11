@@ -49,6 +49,19 @@ export interface PayeeRecord {
   paymentCount: number
 }
 
+/**
+ * The address that invoiced a given reference the last time the payer settled
+ * one. This is what makes a destination change detectable at all: a saved payee
+ * record is looked up *by* address, so on its own it can never disagree with the
+ * invoice it was fetched for.
+ */
+export interface ReferenceRecord {
+  referenceHash: Hex
+  payee: Hex
+  firstSeen: number
+  lastSeen: number
+}
+
 export type PaymentState =
   | 'unpaid'
   | 'pending'

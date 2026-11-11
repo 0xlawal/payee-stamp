@@ -54,7 +54,7 @@ export const TRAILING_CHECKS: CheckResult[] = [
     id: 'destination',
     index: '03',
     label: 'Destination change',
-    detail: 'Nothing saved to compare against.',
+    detail: 'No earlier paid invoice for this reference in this browser.',
     status: 'idle',
     badge: 'NO RECORD',
   },

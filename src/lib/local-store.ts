@@ -1,4 +1,10 @@
-import type { Hex, PayeeRecord, PaymentRecord, PaymentState } from '../types'
+import type {
+  Hex,
+  PayeeRecord,
+  PaymentRecord,
+  PaymentState,
+  ReferenceRecord,
+} from '../types'
 
 const KEY = 'payeestamp.v1'
 const VERSION = 1
@@ -7,10 +13,11 @@ interface StoreShape {
   version: number
   payees: Record<string, PayeeRecord>
   payments: Record<string, PaymentRecord>
+  references: Record<string, ReferenceRecord>
 }
 
 function emptyStore(): StoreShape {
-  return { version: VERSION, payees: {}, payments: {} }
+  return { version: VERSION, payees: {}, payments: {}, references: {} }
 }
 
 function read(): StoreShape {
@@ -23,6 +30,8 @@ function read(): StoreShape {
       version: VERSION,
       payees: parsed.payees ?? {},
       payments: parsed.payments ?? {},
+      // Added after v1 shipped; absent in older payloads and in older backups.
+      references: parsed.references ?? {},
     }
   } catch {
     return emptyStore()
@@ -71,6 +80,29 @@ export function removePayee(address: Hex): void {
   write(store)
 }
 
+export function getReferenceRecord(referenceHash: Hex): ReferenceRecord | undefined {
+  return read().references[key(referenceHash)]
+}
+
+/**
+ * Remember which address invoiced a reference. Written only after a transfer
+ * settles, so a link that merely arrives cannot poison the record.
+ */
+export function saveReference(referenceHash: Hex, payee: Hex): ReferenceRecord {
+  const store = read()
+  const k = key(referenceHash)
+  const now = Math.floor(Date.now() / 1000)
+  const existing = store.references[k]
+
+  const record: ReferenceRecord = existing
+    ? { ...existing, payee, lastSeen: now }
+    : { referenceHash, payee, firstSeen: now, lastSeen: now }
+
+  store.references[k] = record
+  write(store)
+  return record
+}
+
 export function getPayment(invoiceId: Hex): PaymentRecord | undefined {
   return read().payments[key(invoiceId)]
 }
@@ -94,7 +126,8 @@ export function setPayment(
 
   store.payments[k] = record
 
-  if (record.state === 'paid' && record.payee !== '0x') {
+  // Count the transition into "paid", not every write of a paid record.
+  if (record.state === 'paid' && existing?.state !== 'paid' && record.payee !== '0x') {
     const pk = key(record.payee)
     const payeeRecord = store.payees[pk]
     if (payeeRecord) payeeRecord.paymentCount += 1
@@ -120,6 +153,7 @@ export function importBackup(json: string): boolean {
       version: VERSION,
       payees: parsed.payees ?? {},
       payments: parsed.payments ?? {},
+      references: parsed.references ?? {},
     })
     return true
   } catch {

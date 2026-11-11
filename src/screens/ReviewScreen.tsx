@@ -10,7 +10,14 @@ import {
 } from '../lib/chain'
 import { ERC20_ABI, verifyReceipt, waitForReceipt } from '../lib/erc20'
 import { formatAmount } from '../lib/format'
-import { getPayment, getPayeeRecord, savePayee, setPayment } from '../lib/local-store'
+import {
+  getPayment,
+  getPayeeRecord,
+  getReferenceRecord,
+  savePayee,
+  saveReference,
+  setPayment,
+} from '../lib/local-store'
 import { useWallet } from '../lib/wallet'
 import type { Hex } from '../types'
 import { InvoiceSheet } from '../components/InvoiceSheet'
@@ -77,10 +84,12 @@ export function ReviewScreen({ encoded }: { encoded: string }) {
   }
 
   const savedRecord = getPayeeRecord(invoice.payload.payee)
+  const savedReference = getReferenceRecord(invoice.payload.referenceHash)
   const checks = buildChecks({
     payload: invoice.payload,
     signer,
     savedRecord,
+    savedReference,
     recovering,
   })
 
@@ -163,6 +172,7 @@ export function ReviewScreen({ encoded }: { encoded: string }) {
       }
 
       savePayee(payee)
+      saveReference(invoice.payload.referenceHash, payee)
       setPayment(id, { state: 'paid', payee, amount, txHash: hash })
       setPhase('paid')
     } catch (err) {
@@ -216,6 +226,7 @@ export function ReviewScreen({ encoded }: { encoded: string }) {
       }
 
       savePayee(payee)
+      saveReference(invoice.payload.referenceHash, payee)
       setPayment(id, { state: 'paid', payee, amount, txHash: hash })
       setPhase('paid')
     } catch (err) {

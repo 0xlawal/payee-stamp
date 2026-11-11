@@ -164,8 +164,16 @@ proof of the right transfer.
 ## Address changes
 
 A new invoice signed by a new wallet does **not** establish that the new address belongs
-to the previously known payee. If the destination differs from the saved record, the app
-blocks payment and tells the payer to re-establish trust out of band.
+to the previously known payee.
+
+Check 03 catches the substitution case: the app remembers which address invoiced each
+reference the last time you settled one, and if the same reference later arrives from a
+different address, the check fails and payment is blocked. That record is written only
+after a transfer settles, so a link that merely arrives cannot seed it.
+
+A saved payee record cannot do this job on its own. It is looked up *by* the invoice's own
+address, so it always agrees with the invoice it was fetched for and could never report a
+change.
 
 This build does **not** implement a two-wallet rotation co-sign. That would let the old
 and new keys jointly assert continuity, but it is not implemented here, and the app never

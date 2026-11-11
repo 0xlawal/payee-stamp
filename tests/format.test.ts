@@ -24,6 +24,12 @@ describe('parseAmount', () => {
   it('tolerates thousands separators', () => {
     expect(parseAmount('8,400')).toBe(8400n * 10n ** 18n)
   })
+
+  it('rejects an amount a uint256 could not hold', () => {
+    // The bound is on raw base units, so the whole-token limit sits around 10^59.
+    expect(parseAmount('1' + '0'.repeat(60))).toBeNull()
+    expect(parseAmount('1' + '0'.repeat(58))).not.toBeNull()
+  })
 })
 
 describe('formatAmount', () => {
@@ -47,6 +53,17 @@ describe('formatAmount', () => {
 
   it('returns a dash for garbage', () => {
     expect(formatAmount('not-a-number')).toBe('—')
+  })
+
+  it('never renders a non-zero amount as zero', () => {
+    // Anything below the display precision used to collapse to "0", so the pay
+    // button offered to send 0 WIF for an amount that was not zero.
+    expect(formatAmount('1')).toBe('<0.0001')
+    expect(formatAmount((10n ** 13n).toString())).toBe('<0.0001')
+  })
+
+  it('keeps a whole amount whole when the fraction is below display precision', () => {
+    expect(formatAmount(((1000n * 10n ** 18n) + 1n).toString())).toBe('1,000')
   })
 })
 

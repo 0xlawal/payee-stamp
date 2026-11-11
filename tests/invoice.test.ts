@@ -7,7 +7,12 @@ import {
   validatePayload,
 } from '../src/lib/eip712'
 import { buildChecks, paymentGate } from '../src/lib/verify'
-import type { Hex, InvoicePayload, PayeeRecord } from '../src/types'
+import type {
+  Hex,
+  InvoicePayload,
+  PayeeRecord,
+  ReferenceRecord,
+} from '../src/types'
 
 const PAYEE: Hex = '0x5173b8eA6923c2d40267890D45C46a3480954773'
 const OTHER: Hex = '0x0000000000000000000000000000000000000001'
@@ -105,15 +110,20 @@ describe('buildChecks', () => {
     expect(saved.badge).toBe('NEW PAYEE')
   })
 
-  it('flags a changed destination when the saved record differs', () => {
-    const savedRecord: PayeeRecord = {
-      address: OTHER,
-      label: 'Saved',
+  it('flags a changed destination when a different address invoiced the reference', () => {
+    const payload = makePayload()
+    const savedReference: ReferenceRecord = {
+      referenceHash: payload.referenceHash,
+      payee: OTHER,
       firstSeen: 1,
       lastSeen: 1,
-      paymentCount: 2,
     }
-    const checks = buildChecks({ payload: makePayload(), signer: PAYEE, savedRecord })
+    const checks = buildChecks({
+      payload,
+      signer: PAYEE,
+      savedRecord: undefined,
+      savedReference,
+    })
     expect(checks.find((c) => c.id === 'destination')!.status).toBe('fail')
     expect(checks.find((c) => c.id === 'destination')!.badge).toBe('CHANGED')
   })

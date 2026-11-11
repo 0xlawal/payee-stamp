@@ -1,4 +1,10 @@
-import type { CheckResult, Hex, InvoicePayload, PayeeRecord } from '../types'
+import type {
+  CheckResult,
+  Hex,
+  InvoicePayload,
+  PayeeRecord,
+  ReferenceRecord,
+} from '../types'
 import { CHAIN_ID, WIF_TOKEN_ADDRESS } from './chain'
 import { sameAddress } from './eip712'
 
@@ -7,6 +13,12 @@ export interface VerifyContext {
   /** Recovered signer, or null if recovery failed. */
   signer: Hex | null
   savedRecord: PayeeRecord | undefined
+  /**
+   * The address that invoiced this same reference last time the payer settled
+   * one. A saved payee record cannot answer this: it is looked up by the
+   * invoice's own address, so it always agrees with it.
+   */
+  savedReference?: ReferenceRecord
   now?: number
   /** True while signature recovery is still running. */
   recovering?: boolean
@@ -69,18 +81,23 @@ export function buildChecks(ctx: VerifyContext): CheckResult[] {
   }
 
   /* 03 — destination change */
-  const changed = savedRecord !== undefined && !sameAddress(savedRecord.address, payload.payee)
+  // Compared against who invoiced this reference last time, not against the
+  // payee's own saved record: that lookup is keyed by the invoice address, so
+  // it can never disagree with it and the check could never fire.
+  const savedReference = ctx.savedReference
+  const changed =
+    savedReference !== undefined && !sameAddress(savedReference.payee, payload.payee)
   checks.push({
     id: 'destination',
     index: '03',
     label: 'Destination change',
     detail: changed
-      ? 'Invoice address differs from the address you saved for this payee.'
-      : savedRecord
-        ? 'Invoice address matches the saved address.'
-        : 'Nothing saved to compare against.',
-    status: changed ? 'fail' : savedRecord ? 'pass' : 'idle',
-    badge: changed ? 'CHANGED' : savedRecord ? 'NO CHANGE' : 'NO RECORD',
+      ? 'A different address invoiced this same reference the last time you paid it.'
+      : savedReference
+        ? 'Matches the address that invoiced this reference before.'
+        : 'No earlier paid invoice for this reference in this browser.',
+    status: changed ? 'fail' : savedReference ? 'pass' : 'idle',
+    badge: changed ? 'CHANGED' : savedReference ? 'NO CHANGE' : 'NO RECORD',
   })
 
   /* 04 — token contract */

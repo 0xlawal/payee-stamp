@@ -20,22 +20,49 @@ export function Notice({
   )
 }
 
+/**
+ * The async clipboard API is unavailable outside a secure context, which is
+ * exactly what a demo served over plain http looks like. Fall back rather than
+ * failing silently: a copy button that does nothing reads as broken.
+ */
+async function writeClipboard(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+  } catch {
+    // Fall through to the legacy path.
+  }
+
+  try {
+    const el = document.createElement('textarea')
+    el.value = text
+    el.setAttribute('readonly', '')
+    el.style.position = 'fixed'
+    el.style.top = '-9999px'
+    document.body.appendChild(el)
+    el.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(el)
+    return ok
+  } catch {
+    return false
+  }
+}
+
 export function CopyButton({ value, label = 'Copy' }: { value: string; label?: string }) {
-  const [copied, setCopied] = useState(false)
+  const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle')
 
   const copy = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(value)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1400)
-    } catch {
-      setCopied(false)
-    }
+    const ok = await writeClipboard(value)
+    setState(ok ? 'copied' : 'failed')
+    setTimeout(() => setState('idle'), 1600)
   }, [value])
 
   return (
     <button type="button" className="copy-btn" onClick={copy} aria-live="polite">
-      {copied ? 'Copied' : label}
+      {state === 'copied' ? 'Copied' : state === 'failed' ? 'Select and copy' : label}
     </button>
   )
 }
